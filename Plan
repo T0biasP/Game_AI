@@ -1,0 +1,46 @@
+
+ITERATION 1
+The warriors are turn based, square grid combat
+HP = 5
+AC = 10
+Damage = 1
+Can move up to 6 tiles 
+
+To Learn:
+BFS on a grid — you cannot write getLegalActions() without this. It’s the most important thing to be comfortable with before day one. redblobgames.com,
+the movement range article specifically. Read it, then implement a toy BFS on paper or in a scratch file before touching the project.
+
+std::function and lambdas — used in Maneuver and throughout CombatEngine. Specifically make sure you’re comfortable with capture by reference [&] vs capture by
+value [=], since getting this wrong in CombatEngine causes subtle bugs.
+
+pybind11 basics — skim the pybind11 “getting started” documentation. You don’t need to master it, just be comfortable with PYBIND11_MODULE, py::class_, .def(),
+and how vectors are exposed. One hour is enough.
+
+Reread the GameState and Warrior code you already have — specifically advanceTurn(), currentActor(), and buildTurnOrder(). 
+These are called constantly inside CombatEngine and you need them to be second nature.
+
+To do:
+combat engine:
+    reset(teamA, teamB) — constructs a fresh GameState from two vectors of warriors. This is what Python calls at the start of every training combat.
+
+    getLegalActions() — returns a vector of valid action IDs for the current actor. With your stripped ruleset this means: calculate reachable squares within speed using BFS on the grid (returning one move action per reachable square), plus attack if an enemy is adjacent, plus a pass action as a fallback. Action IDs need a consistent encoding — a simple approach is reserving ID 0 for attack, ID 1 for pass, and IDs 2 onwards for movement destinations encoded as (x * gridHeight) + y.
+
+    step(actionId) — resolves the chosen action for the current actor. Decodes the action ID, calls warrior.hit() or updates position, then checks if the actor’s economy is exhausted and calls gameState.advanceTurn() if so. Returns the new state and a reward signal.
+
+    getStateVector() — flattens the current GameState into a float vector for NEAT. With your ruleset: each warrior’s HP ratio, x and y position normalised to grid size, whose turn it is as a one-hot encoding, and current round normalised.
+
+    computeReward() — called inside step(). Suggested components: positive for damage dealt, negative for damage taken, large positive for winning, small negative per round to encourage efficiency.
+
+
+GameState is mostly complete but needs:
+    Grid representation added — a 2D array of passable/impassable cells that BFS in getLegalActions() can query
+    eliminateCombatant() needs to handle the edge case where the eliminated combatant is the current actor — advanceTurn() should be called immediately after removal in that case
+
+
+NEAT
+Three sequential pieces:
+    bindings.cpp — pybind11 exposure of reset(), step(), getLegalActions(), getStateVector(). This is mostly boilerplate once CombatEngine is working.
+
+    combat_env.py — thin Python wrapper that calls the C++ module and presents the standard interface NEAT expects: reset(), step(), encode_state().
+
+    train.py — the NEAT loop. Load config, create population, define eval_genome() which runs N combats per genome and returns average fitness, run for M generations, save the winner.
